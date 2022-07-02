@@ -1,0 +1,41 @@
+server:
+  port: 9090
+  servlet:
+    session:
+      timeout: 6000
+    encoding:
+      charset: UTF-8
+      force: true
+spring:
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+  security:
+    user:
+      name: admin
+      password: admin
+
+config:
+  swagger:
+    enable: true
+  hadoop:
+    hdfs:
+      url: hdfs://node:8020
+      user: root
+  login:
+    enable: true
+    user:
+      username: admin
+      password: admin
+
+file:
+  UploadPath: D:\bigdata\
+logging:
+  level:
+    root: warn
+    com.king: info
+    org.springframework: error
