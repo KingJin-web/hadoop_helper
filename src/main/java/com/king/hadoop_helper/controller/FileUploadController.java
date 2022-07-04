@@ -31,7 +31,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/file")
-@Api(value = "文件上传接口", tags = {"文件操作接口"})
+@Api(value = "文件上传接口", tags = {"文件上传接口"})
 public class FileUploadController {
 
     @Value(value = "${file.UploadPath}")
@@ -39,11 +39,11 @@ public class FileUploadController {
 
 
     private HdfsServiceImpl hdfsService;
+
     @Autowired
     public void setHdfsService(HdfsServiceImpl hdfsService) {
         this.hdfsService = hdfsService;
     }
-
 
 
     //日志
@@ -75,10 +75,10 @@ public class FileUploadController {
         }
         try {
             file.transferTo(dest); //保存文件
-           return ResultObj.success();
+            return ResultObj.success();
         } catch (IllegalStateException | IOException e) {
             e.printStackTrace();
-           return ResultObj.error("文件上传失败");
+            return ResultObj.error("文件上传失败");
         }
     }
 
@@ -96,17 +96,13 @@ public class FileUploadController {
         if (file.isEmpty()) {
             return ResultObj.error("文件为空");
         }
-
 //        String name = redisUtil.getValue(session.getId(),"name");
-        File path = new File(UploadPath + file.getOriginalFilename());
         try {
-            file.transferTo(path);
-            Path path1 = new Path(path.getPath());
-            hdfsService.upload(path1, "", uploadPath);
+            hdfsService.upload(file, file.getOriginalFilename(), uploadPath);
             return ResultObj.success();
-        } catch (IllegalStateException | IOException e) {
+        } catch (IllegalStateException e) {
             e.printStackTrace();
-           return ResultObj.error("文件上传失败");
+            return ResultObj.error("文件上传失败");
         }
     }
 
@@ -126,7 +122,6 @@ public class FileUploadController {
         }
 
     }
-
 
 
 }

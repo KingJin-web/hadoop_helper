@@ -16,6 +16,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
 import javax.servlet.http.HttpServletResponse;
@@ -61,7 +62,7 @@ public class HdfsServiceImpl {
             logger.info("HDFS_PATH:" + HDFS_PATH);
             logger.info("HDFS_USER:" + HDFS_USER);
             logger.info(new URI(HDFS_PATH).toString());
-            logger.info(  FileSystem.get(new URI(HDFS_PATH), configuration, HDFS_USER).toString());
+            logger.info(FileSystem.get(new URI(HDFS_PATH), configuration, HDFS_USER).toString());
             logger.info("HDFS文件系统连接成功");
             fileSystem = FileSystem.get(new URI(HDFS_PATH), configuration, HDFS_USER);
         } catch (IOException | InterruptedException | URISyntaxException e) {
@@ -92,31 +93,35 @@ public class HdfsServiceImpl {
 
     /**
      * http://localhost:8080/downDir?path=/%E6%96%87%E4%BB%B6%E5%A4%B94/
+     *
      * @param path
      * @param stream1
      * @throws IOException
      */
     public void compress(String path, ZipOutputStream stream1) throws IOException {
-        fileSystem = getFileSystem(HDFS_PATH, HDFS_USER);
-        Path path1 = new Path(path);
+        try (FileSystem fileSystem = getFileSystem(HDFS_PATH, HDFS_USER)) {
+            Path path1 = new Path(path);
 
-        FileStatus[] status = fileSystem.listStatus(path1);
+            FileStatus[] status = fileSystem.listStatus(path1);
 
-        String[] split = path.split("/");
-        String lastName = split[split.length - 1];
-        for (int i = 0; i < status.length; i++) {
-            String name = status[i].getPath().toString();
-            name = name.substring(name.indexOf("/" + lastName));
-            if (status[i].isFile()) {
-                Path path2 = status[i].getPath();
-                FSDataInputStream open = fileSystem.open(path2);
-                stream1.putNextEntry(new ZipEntry(name.substring(1)));
-                IOUtils.copyBytes(open, stream1, 1024);
+            String[] split = path.split("/");
+            String lastName = split[split.length - 1];
+            for (FileStatus fileStatus : status) {
+                String name = fileStatus.getPath().toString();
+                name = name.substring(name.indexOf("/" + lastName));
+                if (fileStatus.isFile()) {
+                    Path path2 = fileStatus.getPath();
+                    FSDataInputStream open = fileSystem.open(path2);
+                    stream1.putNextEntry(new ZipEntry(name.substring(1)));
+                    IOUtils.copyBytes(open, stream1, 1024);
 
-            } else {
-                stream1.putNextEntry(new ZipEntry(status[i].getPath().getName()+"/"));
-                compress(status[i].getPath().toString(),stream1);
+                } else {
+                    stream1.putNextEntry(new ZipEntry(fileStatus.getPath().getName() + "/"));
+                    compress(fileStatus.getPath().toString(), stream1);
+                }
             }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -131,14 +136,13 @@ public class HdfsServiceImpl {
      * @param fileName
      */
     public void mkdir(String fileName) {
-        // 需要传递一个Path对象
-        boolean result = false;
-        try {
-            result = fileSystem.mkdirs(new Path("/" + fileName));
+        // 需要传递一个Path对象，表示新建文件夹的路径
+        try (FileSystem fileSystem = getFileSystem(HDFS_PATH, HDFS_USER)) {
+            fileSystem.mkdirs(new Path("/" + fileName));
         } catch (IOException e) {
             e.printStackTrace();
         }
-        System.out.println(result);
+
     }
 
 
@@ -151,20 +155,19 @@ public class HdfsServiceImpl {
      * @return
      */
     public boolean mkdir(String name, String pathS) {
-        fileSystem = getFileSystem(HDFS_PATH, HDFS_USER);
-        Path path;
-        if (pathS == null || pathS.equals("") || pathS.endsWith("undefined")) {
-            path = new Path("/" + name);
-        } else {
-            path = new Path("/" + name + "/" + pathS);
-        }
-        boolean result = false;
-        try {
-            result = fileSystem.mkdirs(path);
-        } catch (IOException e) {
+        try (FileSystem fileSystem = getFileSystem(HDFS_PATH, HDFS_USER)) {
+
+            Path path;
+            if (pathS == null || pathS.equals("") || pathS.endsWith("undefined")) {
+                path = new Path("/" + name);
+            } else {
+                path = new Path("/" + name + "/" + pathS);
+            }
+            return fileSystem.mkdirs(path);
+        } catch (Exception e) {
             e.printStackTrace();
+            return false;
         }
-        return result;
     }
 
     public boolean changeName() {
@@ -174,24 +177,21 @@ public class HdfsServiceImpl {
     }
 
     public boolean changeFileName(String uname, String path, String oldName, String newName) {
-        fileSystem = getFileSystem(HDFS_PATH, HDFS_USER);
-        Path oldPath = new Path("/" + uname + "/" + path + "/" + oldName);
-        Path newPath = new Path("/" + uname + "/" + path + "/" + newName);
-        System.out.println(oldPath);
-        System.out.println(newPath);
-        // 第一个参数是原文件的名称，第二个则是新的名称
-        try {
-            fileSystem.rename(oldPath, newPath);
-        } catch (IOException e) {
+        try (FileSystem fileSystem = getFileSystem(HDFS_PATH, HDFS_USER)) {
+            Path oldPath = new Path("/" + uname + "/" + path + "/" + oldName);
+            Path newPath = new Path("/" + uname + "/" + path + "/" + newName);
+            System.out.println(oldPath);
+            System.out.println(newPath);
+            // 第一个参数是原文件的名称，第二个则是新的名称
+            return fileSystem.rename(oldPath, newPath);
+        } catch (Exception e) {
             e.printStackTrace();
             return false;
         }
-        return true;
     }
 
     /**
      * 上传文件
-     *
      *
      * @param path
      * @param name
@@ -199,12 +199,30 @@ public class HdfsServiceImpl {
      * @return
      */
     public boolean upload(Path path, String name, String uploadPath) {
-        fileSystem = getFileSystem(HDFS_PATH, HDFS_USER);
-        Path path1 = new Path("/" + name + "/" + uploadPath);
-        try {
+        try (FileSystem fileSystem = getFileSystem(HDFS_PATH, HDFS_USER)) {
+            Path path1 = new Path("/" + name + "/" + uploadPath);
             fileSystem.copyFromLocalFile(path, path1);
-            System.out.println(path.toUri());
-            System.out.println(path1.toUri());
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * 文件上传
+     * @param file 文件对象
+     * @param name 文件名称
+     * @param uploadPath 文件路径
+     * @return
+     */
+    public boolean upload(MultipartFile file, String name, String uploadPath) {
+        try (FileSystem fileSystem = getFileSystem(HDFS_PATH, HDFS_USER)) {
+
+//            fileSystem.copyFromLocalFile(path, path1);
+            //out对应的是Hadoop文件系统中的目录
+            OutputStream out = fileSystem.create(new Path(uploadPath + "/" + name));
+            IOUtils.copyBytes(file.getInputStream(), out, 4096, true);
             return true;
         } catch (IOException e) {
             e.printStackTrace();
@@ -220,17 +238,15 @@ public class HdfsServiceImpl {
      * @return
      */
     public List<HdfsFileStatus> query(String name, String pathS) {
-        fileSystem = getFileSystem(HDFS_PATH, HDFS_USER);
-        Path path;
-        if (pathS == null || pathS.equals("") || pathS.endsWith("undefined")) {
-            path = new Path("/" + name);
-        } else {
-            path = new Path("/" + name + "/" + pathS);
-        }
-
-        FileStatus[] fileStatuses;
         List<HdfsFileStatus> list = new ArrayList<>();
-        try {
+        Path path;
+        try (FileSystem fileSystem = getFileSystem(HDFS_PATH, HDFS_USER)) {
+            if (pathS == null || pathS.equals("") || pathS.endsWith("undefined")) {
+                path = new Path("/" + name);
+            } else {
+                path = new Path("/" + name + "/" + pathS);
+            }
+            FileStatus[] fileStatuses;
             fileStatuses = fileSystem.listStatus(path);
             for (FileStatus fileStatus : fileStatuses) {
                 HdfsFileStatus hfs = new HdfsFileStatus();
@@ -261,11 +277,9 @@ public class HdfsServiceImpl {
      * @return
      */
     public List<HdfsFileStatus> queryAll(String name) {
-        fileSystem = getFileSystem(HDFS_PATH, HDFS_USER);
-        Path path = new Path("/" + name);
-        List<HdfsFileStatus> list = new ArrayList<>();
-
-        try {
+        try (FileSystem fileSystem = getFileSystem(HDFS_PATH, HDFS_USER)) {
+            Path path = new Path("/" + name);
+            List<HdfsFileStatus> list = new ArrayList<>();
             RemoteIterator<LocatedFileStatus> iter = fileSystem.listFiles(path, true);
             //这里的第二个参数true表示递归遍历，false反之
             while (iter.hasNext()) {
@@ -285,11 +299,11 @@ public class HdfsServiceImpl {
                 list.add(hfs);
 
             }
+            return list;
         } catch (IOException e) {
             e.printStackTrace();
+            return null;
         }
-
-        return list;
     }
 
     /**
@@ -334,21 +348,19 @@ public class HdfsServiceImpl {
      * @return
      */
     public boolean delete(String name, String dlPath) {
-        fileSystem = getFileSystem(HDFS_PATH, HDFS_USER);
-        Path path;
-        if (name == null || dlPath == null || dlPath.equals("") || dlPath.endsWith("undefined")) {
-            return false;
-        } else {
-            path = new Path("/" + name + "/" + dlPath);
-        }
-        // 第二个参数指定是否要递归删除，false=否，true=是
-        try {
-            fileSystem.delete(path, true);
+        try (FileSystem fileSystem = getFileSystem(HDFS_PATH, HDFS_USER)) {
+            Path path;
+            if (name == null || dlPath == null || dlPath.equals("") || dlPath.endsWith("undefined")) {
+                return false;
+            } else {
+                path = new Path("/" + name + "/" + dlPath);
+            }
+            // 第二个参数指定是否要递归删除，false=否，true=是
+            return fileSystem.delete(path, true);
         } catch (IOException e) {
             e.printStackTrace();
             return false;
         }
-        return true;
     }
 
     public String getFileName(Path path) {
@@ -379,8 +391,7 @@ public class HdfsServiceImpl {
      */
     public ResponseEntity<InputStreamResource> downFile(String name, String paths) {
         Path path = new Path("/" + name + paths);
-        fileSystem = getFileSystem(HDFS_PATH, HDFS_USER);
-        try {
+        try (FileSystem fileSystem = getFileSystem(HDFS_PATH, HDFS_USER)) {
             FSDataInputStream inputStream = fileSystem.open(path);
             return downloadFile(inputStream, getFileName(path));
         } catch (IOException e) {
@@ -390,7 +401,8 @@ public class HdfsServiceImpl {
     }
 
     //网络协议的拼接
-    private ResponseEntity<InputStreamResource> downloadFile(FSDataInputStream inputStream, String fileName) throws IOException {
+    private ResponseEntity<InputStreamResource> downloadFile(FSDataInputStream inputStream, String fileName) throws
+            IOException {
         Byte[] bytes = new Byte[inputStream.available()];
         System.out.println(fileName);
         HttpHeaders httpHeaders = new HttpHeaders();
@@ -413,13 +425,15 @@ public class HdfsServiceImpl {
      * @return
      */
     public StringBuilder lookDoc(String paths) {
-        fileSystem = getFileSystem(HDFS_PATH, HDFS_USER);
+
         StringBuilder builder = new StringBuilder();
         Path path = new Path(paths);
         try (
+                FileSystem fileSystem = getFileSystem(HDFS_PATH, HDFS_USER);
                 FSDataInputStream in = fileSystem.open(path);
                 InputStreamReader isr = new InputStreamReader(in);
                 BufferedReader bf = new BufferedReader(isr);
+
         ) {
             String str;
             while ((str = bf.readLine()) != null) {
@@ -434,14 +448,11 @@ public class HdfsServiceImpl {
     }
 
     public byte[] downFile(String path) {
-        fileSystem = getFileSystem(HDFS_PATH, HDFS_USER);
-        if (EmptyUtil.isEmpty(path)) {
-            return null;
-        }
-        byte[] bytes = null;
-        Path path1 = new Path(path);
-        try {
-
+        try (FileSystem fileSystem = getFileSystem(HDFS_PATH, HDFS_USER)) {
+            if (EmptyUtil.isEmpty(path)) {
+                return null;
+            }
+            Path path1 = new Path(path);
             FSDataInputStream in = fileSystem.open(path1);
             InputStream ins = in.getWrappedStream();
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -451,12 +462,12 @@ public class HdfsServiceImpl {
                 baos.write(bs, 0, length);
             }
             baos.flush();
-            bytes = baos.toByteArray();
+            return baos.toByteArray();
         } catch (IOException e) {
             e.printStackTrace();
+            return null;
         }
 
-        return bytes;
     }
 
     /**
@@ -485,17 +496,18 @@ public class HdfsServiceImpl {
     }
 
     private BufferedImage getImgBuffered(String paths) {
-        fileSystem = getFileSystem(HDFS_PATH, HDFS_USER);
-        BufferedImage bufferedImage = null;
-        Path path = new Path(paths);
-        try {
+        try (FileSystem fileSystem = getFileSystem(HDFS_PATH, HDFS_USER)) {
+            BufferedImage bufferedImage = null;
+            Path path = new Path(paths);
+
             FSDataInputStream in = fileSystem.open(path);
-            bufferedImage = ImageIO.read(in);
+            return ImageIO.read(in);
 
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return bufferedImage;
+
+        return null;
     }
 
     public void outputImage(BufferedImage image, OutputStream os) throws IOException {

@@ -37,7 +37,7 @@ import java.util.List;
  * @create: 2021-05-30 21:26
  */
 @RestController
-@Api(value = "Hdfs文件接口", tags = {"文件操作接口"})
+@Api(value = "Hdfs文件接口", tags = {"Hdfs文件接口"})
 public class HdfsController {
     @Autowired
     private HdfsServiceImpl hdfsService;
