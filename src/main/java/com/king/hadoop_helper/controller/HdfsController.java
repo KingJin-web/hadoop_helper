@@ -13,6 +13,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,7 +74,6 @@ public class HdfsController {
     /**
      * 获取用户目录下或指定目录下的文件
      *
-    
      * @return
      */
     @RequestMapping(value = "/getAllFile", method = {RequestMethod.GET, RequestMethod.POST})
@@ -96,7 +96,7 @@ public class HdfsController {
     @RequestMapping(value = "/getAllFileType", method = {RequestMethod.GET, RequestMethod.POST})
     @ApiOperation(value = "获取用户下指定文件类型文件", notes = "file")
     @ApiImplicitParam(name = "type", value = "type", required = true)
-    public JsonLayui gstAllFileType( int type, int page, int limit) {
+    public JsonLayui gstAllFileType(int type, int page, int limit) {
         JsonLayui js = new JsonLayui();
 
 //        String name = redisUtil.getValue(session.getId(), "name");
@@ -117,14 +117,14 @@ public class HdfsController {
 
     /**
      * 新建文件夹
-
+     *
      * @param dirPath 带路径的文件名
      * @return
      */
     @RequestMapping(value = "/newDir", method = {RequestMethod.GET, RequestMethod.POST})
     @ApiOperation(value = "新建文件夹", notes = "新建")
     @ApiImplicitParam(name = "dirPath", value = "dirPath", required = true)
-    public ResultObj newDir( String dirPath) {
+    public ResultObj newDir(String dirPath) {
 
         //String name = (String) session.getAttribute("name");
 //        String name = redisUtil.getValue(session.getId(), "name");
@@ -142,7 +142,7 @@ public class HdfsController {
     @RequestMapping(value = "/newFile", method = {RequestMethod.GET, RequestMethod.POST})
     @ApiOperation(value = "新建文件", notes = "新建")
     @ApiImplicitParam(name = "FilePath", value = " FilePath", required = true)
-    public ResultObj newFile( String FilePath) {
+    public ResultObj newFile(String FilePath) {
         return ResultObj.success("TOODO");
     }
 
@@ -161,7 +161,7 @@ public class HdfsController {
             @ApiImplicitParam(name = "oldName", value = "oldName", required = true),
             @ApiImplicitParam(name = "newName", value = "newName", required = true)
     })
-    public ResultObj changeFileName( String path, String oldName, String newName) {
+    public ResultObj changeFileName(String path, String oldName, String newName) {
 
         if (path == null || oldName == null || newName == null) {
             return ResultObj.error("参数不能为空!");
@@ -182,7 +182,7 @@ public class HdfsController {
     @RequestMapping(value = "/delFile", method = {RequestMethod.GET, RequestMethod.POST})
     @ApiOperation(value = "删除文件", notes = "删除")
     @ApiImplicitParam(name = "path", value = " path", required = true)
-    public ResultObj delFile( String path) {
+    public ResultObj delFile(String path) {
         // String name = (String) session.getAttribute("name");
 
         if (hdfsService.delete("", path)) {
@@ -197,13 +197,14 @@ public class HdfsController {
     @RequestMapping(value = "/downFile", method = {RequestMethod.GET, RequestMethod.POST})
     @ApiOperation(value = "下载文件", notes = "下载")
     @ApiImplicitParam(name = "path", value = " path", required = true)
-    public ResponseEntity<InputStreamResource> downFile( @RequestParam("path") String path) {
-        System.out.println(path);
+    public ResponseEntity<InputStreamResource> downFile(@RequestParam("path") String path) {
 
+        logger.info(" " + path);
 
 //        String name = redisUtil.getValue(session.getId(), "name");
         ResponseEntity<InputStreamResource> res = null;
         try {
+
             res = hdfsService.downFile("", path);
         } catch (Exception e) {
             e.printStackTrace();
@@ -216,15 +217,15 @@ public class HdfsController {
     @RequestMapping(value = "/lookPhoto", method = RequestMethod.GET)
     @ApiOperation(value = "查看图片", notes = "查看")
     @ApiImplicitParam(name = "path", value = " path", required = true)
-    public ResultObj lookPhoto(String path,HttpServletResponse resp) throws IOException {
+    public ResultObj lookPhoto(String path, HttpServletResponse resp) throws IOException {
 
         if (EmptyUtil.isEmpty(path)) {
             return ResultObj.error("参数不能为空!");
         } else {
-          //  String name = redisUtil.getValue(session.getId(), "name");
-            path = "/"  + path;
+            //  String name = redisUtil.getValue(session.getId(), "name");
+            path = "/" + path;
             hdfsService.outputImage(resp, path);
-           return ResultObj.success("查看成功!");
+            return ResultObj.success("查看成功!");
         }
 
     }
@@ -234,15 +235,13 @@ public class HdfsController {
      * 查看文档
      *
      * @param path
-    
-    
      * @return
      * @throws IOException
      */
     @RequestMapping(value = "/lookDoc", method = {RequestMethod.GET, RequestMethod.POST})
     @ApiOperation(value = "查看文本文件", notes = "查看")
     @ApiImplicitParam(name = "path", value = " path", required = true)
-    public JsonLayui lookDoc(String path ) throws IOException {
+    public JsonLayui lookDoc(String path) throws IOException {
         JsonLayui jsonLayui = new JsonLayui();
         if (EmptyUtil.isEmpty(path)) {
             jsonLayui.setCode(0);
@@ -261,17 +260,16 @@ public class HdfsController {
      * 下载文件夹
      *
      * @param path
-    
      * @param request
      * @return
      */
     @RequestMapping(value = "/downDir", method = RequestMethod.GET)
-    public ResponseEntity<InputStreamResource> downDir(String path,  HttpServletRequest request) {
+    public ResponseEntity<InputStreamResource> downDir(String path, HttpServletRequest request) {
         //String name = redisUtil.getValue(session.getId(), "name");
         ResponseEntity<InputStreamResource> result = null;
         try {
             String filename = hdfsService.getFileName(new Path(path));
-            path = "/"  + path;
+            path = "/" + path;
             result = FileUtil.downDir(path, filename, request);
         } catch (Exception e) {
             e.printStackTrace();

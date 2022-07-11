@@ -96,11 +96,10 @@ public class FileUploadController {
         if (file.isEmpty()) {
             return ResultObj.error("文件为空");
         }
-//        String name = redisUtil.getValue(session.getId(),"name");
         try {
-            hdfsService.upload(file, file.getOriginalFilename(), uploadPath);
-            return ResultObj.success();
-        } catch (IllegalStateException e) {
+            return hdfsService.upload(file, uploadPath);
+
+        } catch (Exception e) {
             e.printStackTrace();
             return ResultObj.error("文件上传失败");
         }

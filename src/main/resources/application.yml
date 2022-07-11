@@ -24,7 +24,7 @@ config:
     enable: true
   hadoop:
     hdfs:
-      url: hdfs://node:8020
+      url: hdfs://king1:8020
       user: root
   login:
     enable: true

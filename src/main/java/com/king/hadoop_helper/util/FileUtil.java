@@ -99,4 +99,129 @@ public class FileUtil {
         stream1.close();
         return stream;
     }
+
+    public static final String winPath = "D:\\a\\";
+    public static final String linuxPath = "/var/tmp/hadoop_helper/";
+
+
+    private static final String OS = System.getProperty("os.name").toLowerCase();
+
+
+    public static boolean isLinux() {
+        return OS.contains("linux");
+    }
+
+    public static boolean isMacOS() {
+        return OS.contains("mac") && OS.indexOf("os") > 0 && !OS.contains("x");
+    }
+
+    public static boolean isMacOSX() {
+        return OS.contains("mac") && OS.indexOf("os") > 0 && OS.indexOf("x") > 0;
+    }
+
+    public static boolean isWindows() {
+        return OS.contains("windows");
+    }
+
+    public enum OsType {
+
+        Linux("Linux"), Mac_OS("Mac OS"), Mac_OS_X("Mac OS X"), Windows("Windows");
+
+        private OsType(String desc) {
+            this.description = desc;
+        }
+
+        public String toString() {
+            return description;
+        }
+
+        private String description;
+    }
+
+    /**
+     * 获取操作系统名字
+     *
+     * @return 操作系统名
+     */
+    public static OsType getOSName() {
+        OsType platform = null;
+        if (isLinux()) {
+            platform = OsType.Linux;
+        } else if (isMacOS()) {
+            platform = OsType.Mac_OS;
+        } else if (isMacOSX()) {
+            platform = OsType.Mac_OS_X;
+        } else if (isWindows()) {
+            platform = OsType.Windows;
+        }
+        return platform;
+    }
+
+    /**
+     * @param args
+     */
+    public static void main(String[] args) {
+        System.out.println(getOSName());// 获取系统类型
+        System.out.println(isWindows());// 判断是否为windows系统
+    }
+
+
+    public static String saveFile(MultipartFile uploadFile) {
+        StringBuilder sb = new StringBuilder();
+
+        if (uploadFile.isEmpty()) {
+            throw new RuntimeException("文件为空");
+        }
+        try {
+            String fileName = uploadFile.getOriginalFilename();
+            if (isLinux()) {
+                File file = new File(linuxPath);
+                if (!file.exists()) {
+                    file.mkdirs();
+                }
+                uploadFile.transferTo(new File(linuxPath, fileName));
+                sb.append(linuxPath).append(uploadFile.getOriginalFilename());
+            } else if (isWindows()) {
+                File file = new File(winPath);
+                if (!file.exists()) {
+                    file.mkdirs();
+                }
+                uploadFile.transferTo(new File(winPath, fileName));
+                sb.append(winPath).append(uploadFile.getOriginalFilename());
+            } else {
+                throw new RuntimeException("操作系统不支持");
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+
+        }
+        return sb.toString();
+
+    }
+
+    /**
+     * @param multipartFiles
+     * @return 返回保存的路径
+     */
+//    public String saveFile(MultipartFile... multipartFiles) {
+//        StringBuilder sb = new StringBuilder();
+//        try {
+//            for (MultipartFile multipartFile : multipartFiles) {
+//                multipartFile.transferTo(new File(imgPath, multipartFile.getOriginalFilename()));
+//                String osname = System.getProperty("os.name").toLowerCase();
+//                if (osname.contains("linux")) {
+//                    sb.append(imgPath).append(multipartFile.getOriginalFilename());
+//                } else if (osname.contains("windows")) {
+//                    sb.append("H:\\king\\springboot\\mooc\\userImg\\").append(multipartFile.getOriginalFilename());
+//                }
+//
+//            }
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//            return "上传失败!";
+//        }
+//        return sb.toString();
+//    }
+
 }

@@ -33,6 +33,9 @@ public class ResultObj {
         this.data = data;
     }
 
+    public ResultObj(boolean b, String s) {
+    }
+
     public static ResultObj error() {
         return error(0, "操作失败");
     }

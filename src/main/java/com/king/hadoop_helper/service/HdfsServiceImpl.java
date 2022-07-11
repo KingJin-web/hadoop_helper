@@ -4,6 +4,7 @@ import com.king.hadoop_helper.entity.HdfsFileStatus;
 import com.king.hadoop_helper.util.EmptyUtil;
 import com.king.hadoop_helper.util.HdfsUtil;
 import com.king.hadoop_helper.util.TimeUtil;
+import com.king.hadoop_helper.vo.ResultObj;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.io.IOUtils;
@@ -53,22 +54,34 @@ public class HdfsServiceImpl {
     //日志
     private static final Logger logger = LoggerFactory.getLogger(HdfsServiceImpl.class);
 
-    public FileSystem getFileSystem(String HDFS_PATH, String HDFS_USER) {
-        // 配置对象
-        Configuration configuration = new Configuration();
-        // 第一参数是服务器的URI，第二个参数是配置对象，第三个参数是文件系统的用户名
-        try {
 
-            logger.info("HDFS_PATH:" + HDFS_PATH);
-            logger.info("HDFS_USER:" + HDFS_USER);
-            logger.info(new URI(HDFS_PATH).toString());
-            logger.info(FileSystem.get(new URI(HDFS_PATH), configuration, HDFS_USER).toString());
-            logger.info("HDFS文件系统连接成功");
-            fileSystem = FileSystem.get(new URI(HDFS_PATH), configuration, HDFS_USER);
+    /**
+     * 获取HDFS配置信息
+     *
+     * @return
+     * @throws Exception
+     */
+
+    public Configuration getConfiguration() {
+        Configuration configuration = new Configuration();
+        configuration.set("fs.defaultFS", HDFS_PATH);
+        configuration.set("fs.hdfs.impl.disable.cache", "true");
+        configuration.set("dfs.client.use.datanode.hostname", "true");
+        //其它参数
+        return configuration;
+    }
+
+    public FileSystem getFileSystem(String HDFS_PATH, String HDFS_USER) {
+
+        try {
+            // 第一参数是服务器的URI，第二个参数是配置对象，第三个参数是文件系统的用户名
+            return FileSystem.get(new URI(HDFS_PATH), getConfiguration(), HDFS_USER);
         } catch (IOException | InterruptedException | URISyntaxException e) {
             e.printStackTrace();
+            logger.error("HDFS文件系统连接失败");
+            return null;
         }
-        return fileSystem;
+
     }
 //    public HdfsServiceImpl() {
 //        configuration = new Configuration();
@@ -211,22 +224,39 @@ public class HdfsServiceImpl {
 
     /**
      * 文件上传
-     * @param file 文件对象
-     * @param name 文件名称
+     *
+     * @param file       文件对象
      * @param uploadPath 文件路径
      * @return
      */
-    public boolean upload(MultipartFile file, String name, String uploadPath) {
-        try (FileSystem fileSystem = getFileSystem(HDFS_PATH, HDFS_USER)) {
-
-//            fileSystem.copyFromLocalFile(path, path1);
+    public ResultObj upload(MultipartFile file, String uploadPath) {
+        FileSystem fileSystem = getFileSystem(HDFS_PATH, HDFS_USER);
+        try {
+            // 先判断文件夹是否存在，如果不存在，则创建文件夹
+            if (file.isEmpty()) {
+                return ResultObj.error("文件为空");
+            }
+            String fileName = file.getOriginalFilename();
+            //上传文件
+//            String path = com.king.hadoop_helper.util.FileUtil.saveFile(file);
+//
+//            fileSystem.copyFromLocalFile(true, new Path(path), new Path("/" + uploadPath + "/" + fileName));
             //out对应的是Hadoop文件系统中的目录
-            OutputStream out = fileSystem.create(new Path(uploadPath + "/" + name));
-            IOUtils.copyBytes(file.getInputStream(), out, 4096, true);
-            return true;
-        } catch (IOException e) {
+            FSDataOutputStream out = fileSystem.create(new Path(uploadPath + "/" + fileName));
+            //OutputStream out = fileSystem.create(new Path(uploadPath + "/" + name));
+            IOUtils.copyBytes(file.getInputStream(), out, getConfiguration());
+            //  IOUtils.copyBytes(file.getInputStream(), out, 4096, true);
+
+            return ResultObj.success("上传成功");
+        } catch (Exception e) {
             e.printStackTrace();
-            return false;
+            return ResultObj.error("上传失败");
+        } finally {
+            try {
+                fileSystem.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -390,8 +420,9 @@ public class HdfsServiceImpl {
      * @return
      */
     public ResponseEntity<InputStreamResource> downFile(String name, String paths) {
-        Path path = new Path("/" + name + paths);
-        try (FileSystem fileSystem = getFileSystem(HDFS_PATH, HDFS_USER)) {
+        Path path = new Path(HDFS_PATH + paths);
+        FileSystem fileSystem = getFileSystem(HDFS_PATH, HDFS_USER);
+        try {
             FSDataInputStream inputStream = fileSystem.open(path);
             return downloadFile(inputStream, getFileName(path));
         } catch (IOException e) {
@@ -413,7 +444,7 @@ public class HdfsServiceImpl {
         httpHeaders.add("Pragma", "no-cache");
         httpHeaders.add("Expires", "0");
         httpHeaders.add("Content-Language", "UTF-8");
-        System.out.println(httpHeaders);
+        logger.info(httpHeaders.toString());
         return ResponseEntity.ok().headers(httpHeaders).contentLength(bytes.length)
                 .contentType(MediaType.parseMediaType("application/octet-stream;charset=UTF-8")).body(new InputStreamResource(inputStream));
     }
